@@ -1,0 +1,20 @@
+0 Test Tower
+0 Name: test_tower.ldr
+0 Author: Claude (Meta Knight) + Luka
+
+0 STEP
+0 // Step 1: Red 2x4 brick at the base (ground level)
+1 4 0 0 0 1 0 0 0 1 0 0 0 1 3001.dat
+0 STEP
+
+0 // Step 2: Blue 2x4 brick stacked on top
+1 1 0 -24 0 1 0 0 0 1 0 0 0 1 3001.dat
+0 STEP
+
+0 // Step 3: Yellow 2x4 brick stacked on top
+1 14 0 -48 0 1 0 0 0 1 0 0 0 1 3001.dat
+0 STEP
+
+0 // Step 4: Green 2x2 brick on top, centered
+1 2 0 -72 0 1 0 0 0 1 0 0 0 1 3003.dat
+0 STEP

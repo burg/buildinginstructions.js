@@ -1,0 +1,13 @@
+0 Chicken
+0 Name: chicken.ldr
+0 Author: Max
+0 !LDRAW_ORG Unofficial_Model
+0 STEP
+1 15 0 0 0 1 0 0 0 1 0 0 0 1 3003.dat
+0 STEP
+1 15 10 -24 0 1 0 0 0 1 0 0 0 1 3005.dat
+0 STEP
+1 14 10 -24 -10 0 0 -1 0 1 0 1 0 0 3024.dat
+0 STEP
+1 4 10 -48 0 1 0 0 0 1 0 0 0 1 3024.dat
+0 STEP

@@ -1,0 +1,30 @@
+0 FILE dachshund.ldr
+0 dachshund
+0 Name: dachshund.ldr
+0 Author: LEGO AI
+0 !LDRAW_ORG Unofficial_Model
+0 !LICENSE Redistributable under CCAL version 2.0 : see CAreadme.txt
+
+0 STEP
+0 // Step 1: Four legs (1x1 bricks at ground level)
+1 70 30 0 -10 1 0 0 0 1 0 0 0 1 3005.dat
+1 70 30 0 10 1 0 0 0 1 0 0 0 1 3005.dat
+1 70 -30 0 -10 1 0 0 0 1 0 0 0 1 3005.dat
+1 70 -30 0 10 1 0 0 0 1 0 0 0 1 3005.dat
+
+0 STEP
+0 // Step 2: Plates on top of legs
+1 70 30 -8 -10 1 0 0 0 1 0 0 0 1 3024.dat
+1 70 30 -8 10 1 0 0 0 1 0 0 0 1 3024.dat
+1 70 -30 -8 -10 1 0 0 0 1 0 0 0 1 3024.dat
+1 70 -30 -8 10 1 0 0 0 1 0 0 0 1 3024.dat
+
+0 STEP
+0 // Step 3: Body - 2x4 brick (main torso) and 1x4 brick (extended back)
+1 70 0 -32 0 1 0 0 0 1 0 0 0 1 3001.dat
+1 70 -80 -32 0 1 0 0 0 1 0 0 0 1 3010.dat
+
+0 STEP
+0 // Step 4: Head (1x2 brick on front) and tail (1x1 plate on rear)
+1 70 30 -56 0 1 0 0 0 1 0 0 0 1 3004.dat
+1 70 -100 -40 0 1 0 0 0 1 0 0 0 1 3024.dat

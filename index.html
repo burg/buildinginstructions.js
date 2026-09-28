@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>LEGO AI Instructions — Trial Browser</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1 { color: #333; }
+        h2 { color: #555; margin-top: 30px; border-bottom: 2px solid #ddd; padding-bottom: 5px; }
+        .trial-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 12px;
+            margin-top: 10px;
+        }
+        .trial-card {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 12px;
+            cursor: pointer;
+            transition: box-shadow 0.2s;
+        }
+        .trial-card:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+        .trial-card a {
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+        .trial-thumb {
+            width: 100%;
+            height: 150px;
+            border-radius: 4px;
+            margin-bottom: 8px;
+            background: #eee;
+            object-fit: contain;
+            display: block;
+        }
+        .trial-name { font-weight: 600; font-size: 14px; }
+        .trial-meta { font-size: 12px; color: #888; margin-top: 4px; }
+        .badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .badge-simple { background: #d4edda; color: #155724; }
+        .badge-medium { background: #fff3cd; color: #856404; }
+        .badge-complex { background: #f8d7da; color: #721c24; }
+        #status { color: #666; font-style: italic; }
+
+        @media (prefers-color-scheme: dark) {
+            body { background: #1a1a1a; color: #e0e0e0; }
+            h1 { color: #e0e0e0; }
+            h2 { color: #bbb; border-bottom-color: #444; }
+            .trial-card { background: #2a2a2a; border-color: #444; }
+            .trial-card:hover { box-shadow: 0 2px 8px rgba(255,255,255,0.1); }
+            .trial-card a { color: #e0e0e0; }
+            .trial-meta { color: #999; }
+            #status { color: #999; }
+            .trial-thumb { background: #2a2a2a; }
+            .controls button { background: #444 !important; color: #bbb !important; border-color: #666 !important; }
+            .controls button:hover { background: #555 !important; color: #ddd !important; }
+            .controls button.active { background: #f0c040 !important; color: #1a1a1a !important; border-color: #f0c040 !important; font-weight: 600; }
+            .badge-simple { background: #1a3a2a; color: #7dcea0; }
+            .badge-medium { background: #3a3520; color: #f0c040; }
+            .badge-complex { background: #3a1a1a; color: #e08080; }
+        }
+        .controls { margin: 15px 0; }
+        .controls button {
+            padding: 6px 14px;
+            margin-right: 6px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            cursor: pointer;
+            background: white;
+        }
+        .controls button.active {
+            background: #333;
+            color: white;
+            border-color: #333;
+        }
+    </style>
+</head>
+<body>
+    <!-- Three.js + LDraw renderer for thumbnails -->
+    <script src="js/three.min.js"></script>
+    <script src="js/CopyShader.js"></script><script src="js/Pass.js"></script><script src="js/OutlinePass.js"></script><script src="js/ShaderPass.js"></script><script src="js/RenderPass.js"></script><script src="js/MaskPass.js"></script><script src="js/EffectComposer.js"></script>
+    <script src="js/colors.js"></script><script src="js/LDRShaders.js"></script><script src="js/LDRColorMaterials.js"></script><script src="js/LDRGeometries.js"></script><script src="js/LDRLoader.js"></script>
+    <script src="js/LDRGenerator.js"></script><script src="js/LDRStuds.js"></script><script src="js/StudioTexmap.js"></script>
+    <script src="js/thumbnail.js"></script>
+
+    <h1>LEGO AI Instructions — Trial Browser</h1>
+    <p id="status">Scanning for models...</p>
+
+    <div class="controls" id="complexity-filter">
+        <strong>Complexity:</strong>
+        <button class="active" onclick="filterComplexity('all')">All</button>
+        <button onclick="filterComplexity('simple')">Simple</button>
+        <button onclick="filterComplexity('medium')">Medium</button>
+        <button onclick="filterComplexity('complex')">Complex</button>
+        <button onclick="filterComplexity('reference')">Reference</button>
+    </div>
+    <div class="controls" id="experiment-filter">
+        <strong>Experiment:</strong>
+        <!-- populated dynamically -->
+    </div>
+
+    <div id="content"></div>
+
+    <script>
+        // Known trial naming convention: {promptId}_run{n}.ldr
+        // Prompt IDs: s1-s5 (simple), m1-m5 (medium), c1-c5 (complex)
+        const promptNames = {
+            s1: 'Color Tower', s2: 'Small Wall', s3: 'Traffic Light', s4: 'Park Bench', s5: 'Letter L',
+            m1: 'Doorway', m2: 'Staircase', m3: 'Tree', m4: 'Well', m5: 'Table',
+            c1: 'Small House', c2: 'Bridge', c3: 'Car', c4: 'Castle Tower', c5: 'Rocket',
+        };
+
+        // Experiment directories to scan (symlinked into models/)
+        const experiments = ['experiment1_sonnet', 'experiment1_opus'];
+
+        function getComplexity(id) {
+            if (id.startsWith('s')) return 'simple';
+            if (id.startsWith('m')) return 'medium';
+            if (id.startsWith('c')) return 'complex';
+            return 'reference';
+        }
+
+        function parseTrialName(filename, experiment) {
+            const match = filename.match(/^((?:s|m|c)\d+)_run(\d+)\.ldr$/);
+            if (match) {
+                const promptId = match[1];
+                const run = match[2];
+                const complexity = getComplexity(promptId);
+                const name = promptNames[promptId] || promptId;
+                return { promptId, run, complexity, name, experiment, isReference: false };
+            }
+            return { promptId: null, run: null, complexity: 'reference', name: filename.replace('.ldr', ''), experiment, isReference: true };
+        }
+
+        async function scanExperimentDir(experiment) {
+            try {
+                const resp = await fetch(`models/${experiment}/`);
+                if (!resp.ok) return [];
+                const html = await resp.text();
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const links = Array.from(doc.querySelectorAll('a'));
+                return links
+                    .map(a => a.textContent.trim())
+                    .filter(name => name.endsWith('.ldr'))
+                    .map(name => ({
+                        file: `${experiment}/${name}`,
+                        ...parseTrialName(name, experiment)
+                    }));
+            } catch (e) {
+                return [];
+            }
+        }
+
+        async function scanRootModels() {
+            const resp = await fetch('models/');
+            const html = await resp.text();
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const links = Array.from(doc.querySelectorAll('a'));
+            return links
+                .map(a => a.textContent.trim())
+                .filter(name => name.endsWith('.ldr'))
+                .map(name => ({
+                    file: name,
+                    ...parseTrialName(name, 'reference')
+                }));
+        }
+
+        function renderCards(trials, complexityFilter, experimentFilter) {
+            const content = document.getElementById('content');
+            content.innerHTML = '';
+
+            let filtered = trials;
+            if (complexityFilter !== 'all') {
+                filtered = filtered.filter(t => t.complexity === complexityFilter);
+            }
+            if (experimentFilter !== 'all') {
+                filtered = filtered.filter(t => t.experiment === experimentFilter);
+            }
+
+            // Group by experiment then complexity
+            const byExperiment = {};
+            for (const t of filtered) {
+                if (!byExperiment[t.experiment]) byExperiment[t.experiment] = {};
+                if (!byExperiment[t.experiment][t.complexity]) byExperiment[t.experiment][t.complexity] = [];
+                byExperiment[t.experiment][t.complexity].push(t);
+            }
+
+            const complexityOrder = ['simple', 'medium', 'complex', 'reference'];
+
+            for (const [experiment, groups] of Object.entries(byExperiment).sort()) {
+                const expHeader = document.createElement('h2');
+                expHeader.textContent = experiment;
+                expHeader.style.fontSize = '1.3em';
+                content.appendChild(expHeader);
+
+                for (const complexity of complexityOrder) {
+                    const group = groups[complexity];
+                    if (!group || group.length === 0) continue;
+
+                    const subHeader = document.createElement('h3');
+                    subHeader.textContent = complexity.charAt(0).toUpperCase() + complexity.slice(1);
+                    subHeader.style.color = '#888';
+                    subHeader.style.margin = '12px 0 6px 0';
+                    content.appendChild(subHeader);
+
+                    const grid = document.createElement('div');
+                    grid.className = 'trial-grid';
+
+                    group.sort((a, b) => {
+                        if (a.promptId !== b.promptId) return (a.promptId || '').localeCompare(b.promptId || '');
+                        return (a.run || 0) - (b.run || 0);
+                    });
+
+                    for (const trial of group) {
+                        const card = document.createElement('div');
+                        card.className = 'trial-card';
+                        const badgeClass = `badge-${trial.complexity}`;
+                        card.innerHTML = `
+                            <a href="view.html?model=${trial.file}" target="_blank">
+                                <img class="trial-thumb trial-thumb-img" data-model="models/${trial.file}" alt="${trial.name}">
+                                <div class="trial-name">${trial.name}</div>
+                                <div class="trial-meta">
+                                    <span class="badge ${badgeClass}">${trial.complexity}</span>
+                                    ${trial.run ? `Run ${trial.run}` : ''}
+                                    — ${trial.file}
+                                </div>
+                            </a>
+                        `;
+                        grid.appendChild(card);
+                    }
+                    content.appendChild(grid);
+                }
+            }
+
+            document.getElementById('status').textContent = `Found ${filtered.length} of ${allTrials.length} models`;
+
+            // Render thumbnails after a tick to let DOM update
+            setTimeout(() => renderAllThumbnails('.trial-thumb-img', 250), 100);
+        }
+
+        let allTrials = [];
+        let currentComplexity = 'all';
+        let currentExperiment = 'all';
+
+        async function init() {
+            // Scan all experiment dirs + root models
+            const results = await Promise.all([
+                scanRootModels(),
+                ...experiments.map(e => scanExperimentDir(e))
+            ]);
+            allTrials = results.flat();
+
+            // Build experiment filter buttons
+            const expFilter = document.getElementById('experiment-filter');
+            const foundExperiments = [...new Set(allTrials.map(t => t.experiment))].sort();
+            const allBtn = document.createElement('button');
+            allBtn.className = 'active';
+            allBtn.textContent = 'All';
+            allBtn.onclick = () => filterExperiment('all');
+            expFilter.appendChild(allBtn);
+            for (const exp of foundExperiments) {
+                const btn = document.createElement('button');
+                btn.textContent = exp;
+                btn.onclick = () => filterExperiment(exp);
+                expFilter.appendChild(btn);
+            }
+
+            renderCards(allTrials, currentComplexity, currentExperiment);
+        }
+
+        function filterComplexity(type) {
+            currentComplexity = type;
+            document.querySelectorAll('#complexity-filter button').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+            renderCards(allTrials, currentComplexity, currentExperiment);
+        }
+
+        function filterExperiment(exp) {
+            currentExperiment = exp;
+            document.querySelectorAll('#experiment-filter button').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+            renderCards(allTrials, currentComplexity, currentExperiment);
+        }
+
+        init();
+    </script>
+</body>
+</html>

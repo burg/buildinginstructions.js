@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Thumbnail Test</title>
+    <style>
+        body { background: #1a1a1a; color: #eee; font-family: sans-serif; padding: 20px; }
+        .result { display: inline-block; margin: 10px; text-align: center; }
+        .result img { border: 1px solid #444; border-radius: 4px; display: block; margin-bottom: 4px; }
+        .result .label { font-size: 12px; color: #aaa; }
+        #log { background: #111; padding: 10px; margin-top: 20px; font-family: monospace; font-size: 12px;
+               max-height: 300px; overflow-y: auto; border: 1px solid #333; border-radius: 4px; }
+        #log .error { color: #e08080; }
+        #log .ok { color: #7dcea0; }
+        #log .info { color: #88b8e8; }
+    </style>
+</head>
+<body>
+    <h2>Thumbnail Renderer Test</h2>
+    <p>Tests rendering LDraw models to data:url images via a single reusable canvas.</p>
+    <div id="results"></div>
+    <h3>Log</h3>
+    <div id="log"></div>
+
+    <script src="js/three.min.js"></script>
+    <script src="js/CopyShader.js"></script><script src="js/Pass.js"></script>
+    <script src="js/OutlinePass.js"></script><script src="js/ShaderPass.js"></script>
+    <script src="js/RenderPass.js"></script><script src="js/MaskPass.js"></script>
+    <script src="js/EffectComposer.js"></script>
+    <script src="js/colors.js"></script><script src="js/LDRShaders.js"></script>
+    <script src="js/LDRColorMaterials.js"></script>
+    <script src="js/LDRGeometries.js"></script><script src="js/LDRLoader.js"></script>
+    <script src="js/LDRGenerator.js"></script><script src="js/LDRStuds.js"></script>
+    <script src="js/StudioTexmap.js"></script>
+
+    <script>
+        const logEl = document.getElementById('log');
+        function log(msg, cls) {
+            const line = document.createElement('div');
+            line.className = cls || 'info';
+            line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            logEl.appendChild(line);
+            logEl.scrollTop = logEl.scrollHeight;
+            console.log(`[thumb] ${msg}`);
+        }
+
+        // BJB> Logging wrapper for debugging render failures
+        LDR.Studs.makeGenerators('', 0, 1);
+        log('Studs initialized');
+
+        const testModels = [
+            'models/test_tower.ldr',
+            'models/hot_tub.ldr',
+            'models/experiment1_opus/s1_run1.ldr',
+            'models/experiment1_opus/m1_run1.ldr',
+            'models/experiment1_opus/s3_run1.ldr',
+        ];
+
+        const SIZE = 200;
+        let idx = 0;
+
+        function renderNext() {
+            if (idx >= testModels.length) {
+                log(`Done: ${testModels.length} models processed`, 'ok');
+                return;
+            }
+
+            const modelPath = testModels[idx];
+            idx++;
+            log(`Rendering ${modelPath}...`);
+
+            const canvas = document.createElement('canvas');
+            canvas.width = SIZE;
+            canvas.height = SIZE;
+
+            let renderer;
+            try {
+                renderer = new THREE.WebGLRenderer({
+                    canvas: canvas,
+                    antialias: true,
+                    preserveDrawingBuffer: true
+                });
+                renderer.setPixelRatio(1);
+                renderer.setSize(SIZE, SIZE);
+                log(`  WebGL context created`);
+            } catch (e) {
+                log(`  FAILED to create WebGL context: ${e}`, 'error');
+                addResult(modelPath, null, `WebGL error: ${e.message}`);
+                setTimeout(renderNext, 50);
+                return;
+            }
+
+            const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 1000000);
+            const scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x2a2a2a);
+
+            const baseObject = new THREE.Group();
+            const opaqueObject = new THREE.Group();
+            const sixteenObject = new THREE.Group();
+            const transObject = new THREE.Group();
+            baseObject.add(opaqueObject);
+            baseObject.add(sixteenObject);
+            baseObject.add(transObject);
+            scene.add(baseObject);
+
+            const mc = new LDR.MeshCollector(opaqueObject, sixteenObject, transObject);
+
+            const onLoad = function () {
+                try {
+                    log(`  Generating geometry...`);
+                    ldrLoader.generate(14, mc);
+
+                    const b = mc.boundingBox;
+                    const center = new THREE.Vector3();
+                    b.getCenter(center);
+                    baseObject.position.set(-center.x, -center.y, -center.z);
+
+                    const modelSize = b.min.distanceTo(b.max);
+                    camera.position.set(modelSize, 0.7 * modelSize, modelSize);
+                    camera.lookAt(new THREE.Vector3());
+                    camera.far = 2 * modelSize;
+                    camera.left = -SIZE;
+                    camera.right = SIZE;
+                    camera.top = SIZE;
+                    camera.bottom = -SIZE;
+                    camera.zoom = 1.4 * SIZE / modelSize;
+                    camera.updateProjectionMatrix();
+
+                    renderer.render(scene, camera);
+
+                    const dataURL = canvas.toDataURL('image/png');
+                    log(`  Rendered OK (${(dataURL.length / 1024).toFixed(1)} KB)`, 'ok');
+                    addResult(modelPath, dataURL, null);
+                } catch (e) {
+                    log(`  RENDER ERROR: ${e.message}`, 'error');
+                    log(`  Stack: ${e.stack}`, 'error');
+                    addResult(modelPath, null, e.message);
+                }
+
+                renderer.dispose();
+                renderer.forceContextLoss();
+                setTimeout(renderNext, 100);
+            };
+
+            const onError = function (e) {
+                log(`  LOAD ERROR: ${e || 'unknown'}`, 'error');
+                addResult(modelPath, null, 'Load failed');
+                renderer.dispose();
+                renderer.forceContextLoss();
+                setTimeout(renderNext, 100);
+            };
+
+            // BJB> Catch constructor errors too
+            try {
+                var ldrLoader = new THREE.LDRLoader(onLoad, null, {
+                    cleanUpPrimitivesAndSubParts: false
+                });
+                log(`  LDRLoader created, loading...`);
+                ldrLoader.load(modelPath);
+            } catch (e) {
+                log(`  LDRLoader EXCEPTION: ${e.message}`, 'error');
+                addResult(modelPath, null, e.message);
+                renderer.dispose();
+                renderer.forceContextLoss();
+                setTimeout(renderNext, 100);
+            }
+        }
+
+        function addResult(modelPath, dataURL, error) {
+            const container = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = 'result';
+
+            const img = document.createElement('img');
+            img.width = SIZE;
+            img.height = SIZE;
+
+            if (dataURL) {
+                img.src = dataURL;
+            } else {
+                // Error placeholder
+                const c = document.createElement('canvas');
+                c.width = SIZE; c.height = SIZE;
+                const ctx = c.getContext('2d');
+                ctx.fillStyle = '#3a1a1a';
+                ctx.fillRect(0, 0, SIZE, SIZE);
+                ctx.fillStyle = '#e08080';
+                ctx.font = '13px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(error || 'error', SIZE / 2, SIZE / 2);
+                img.src = c.toDataURL('image/png');
+            }
+
+            const label = document.createElement('div');
+            label.className = 'label';
+            label.textContent = modelPath.split('/').pop();
+
+            div.appendChild(img);
+            div.appendChild(label);
+            container.appendChild(div);
+        }
+
+        log(`Starting test: ${testModels.length} models`);
+        renderNext();
+    </script>
+</body>
+</html>

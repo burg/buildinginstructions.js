@@ -1,0 +1,31 @@
+0 Hot Tub
+0 Name: hot_tub.ldr
+0 Author: Claude (Meta Knight) + Luka
+
+0 // Step 1: Base - three light gray 2x6 plates side by side for a 6x6 floor
+1 7 0 0 -40 1 0 0 0 1 0 0 0 1 3795.dat
+1 7 0 0 0 1 0 0 0 1 0 0 0 1 3795.dat
+1 7 0 0 40 1 0 0 0 1 0 0 0 1 3795.dat
+0 STEP
+
+0 // Step 2: First wall course - reddish brown (cedar)
+0 // Front and back walls: 1x6 bricks
+1 70 0 -24 -50 1 0 0 0 1 0 0 0 1 3009.dat
+1 70 0 -24 50 1 0 0 0 1 0 0 0 1 3009.dat
+0 // Side walls: 1x4 bricks rotated 90 degrees around Y
+1 70 -50 -24 0 0 0 1 0 1 0 -1 0 0 3010.dat
+1 70 50 -24 0 0 0 1 0 1 0 -1 0 0 3010.dat
+0 STEP
+
+0 // Step 3: Interior - hidden support bricks + transparent water plate
+1 9 0 -24 -20 1 0 0 0 1 0 0 0 1 3001.dat
+1 9 0 -24 20 1 0 0 0 1 0 0 0 1 3001.dat
+1 41 0 -32 0 1 0 0 0 1 0 0 0 1 3031.dat
+0 STEP
+
+0 // Step 4: Second wall course - more reddish brown
+1 70 0 -48 -50 1 0 0 0 1 0 0 0 1 3009.dat
+1 70 0 -48 50 1 0 0 0 1 0 0 0 1 3009.dat
+1 70 -50 -48 0 0 0 1 0 1 0 -1 0 0 3010.dat
+1 70 50 -48 0 0 0 1 0 1 0 -1 0 0 3010.dat
+0 STEP
